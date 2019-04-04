@@ -3,4 +3,15 @@ project(msocks)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(msocks main.cpp)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -Wall")
+
+
+find_package(Boost REQUIRED)
+add_definitions(-DBOOST_ASIO_NO_DEPRECATED)
+add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
+add_definitions(-DGLOG_NO_ABBREVIATED_SEVERITIES)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/src)
