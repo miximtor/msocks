@@ -2,8 +2,6 @@
 
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <cryptopp/secblock.h>
-#include <cryptopp/salsa.h>
 #include <botan/stream_cipher.h>
 #include <usings.hpp>
 
