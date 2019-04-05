@@ -3,8 +3,8 @@
 #include <boost/asio/ip/tcp.hpp>
 
 #include <boost/asio/spawn.hpp>
-#include <usings.hpp>
 #include <boost/asio/write.hpp>
+#include <usings.hpp>
 
 namespace msocks
 {

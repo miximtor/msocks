@@ -4,7 +4,7 @@
 #include <boost/asio/write.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <botan-2/botan/stream_cipher.h>
-#include <utility/dup.hpp>
+#include <utility/socket_pair.hpp>
 #include <glog/logging.h>
 #include <botan/auto_rng.h>
 

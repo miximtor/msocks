@@ -9,7 +9,7 @@
 #include <botan/auto_rng.h>
 
 #include <utility/socks_constants.hpp>
-#include <utility/dup.hpp>
+#include <utility/socket_pair.hpp>
 
 namespace msocks
 {
