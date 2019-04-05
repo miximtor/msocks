@@ -6,15 +6,15 @@
 
 #include <glog/logging.h>
 
-#include <cryptopp/salsa.h>
-#include <cryptopp/osrng.h>
+#include <botan/auto_rng.h>
 
 #include <utility/socks_constants.hpp>
+#include <utility/dup.hpp>
 
 namespace msocks
 {
 
-bool client_session::do_socks5_auth(yield_context &yield)
+bool client_session::local_socks_auth(yield_context yield)
 {
   struct __attribute__((packed))
   {
@@ -49,7 +49,6 @@ bool client_session::do_socks5_auth(yield_context &yield)
   
   if ( !find_auth )
   {
-    LOG(WARNING) << "anonymous auth method not found";
     return false;
   }
   
@@ -69,7 +68,7 @@ bool client_session::do_socks5_auth(yield_context &yield)
 }
 
 std::pair<bool, std::string>
-client_session::do_get_proxy_addr(yield_context &yield)
+client_session::get_host_service(yield_context yield)
 {
   struct __attribute__((packed))
   {
@@ -88,7 +87,6 @@ client_session::do_get_proxy_addr(yield_context &yield)
   
   if ( request.version != constant::SOCKS5_VERSION )
   {
-    LOG(WARNING) << "unsupported version: " << request.version;
     return {false, ""};
   }
   
@@ -99,7 +97,7 @@ client_session::do_get_proxy_addr(yield_context &yield)
     case constant::CONN_BND:
     case constant::CONN_UDP:
     default:
-      LOG(WARNING) << "unsupported cmd: " << request.cmd;
+      LOG(INFO) << "unsupported cmd: " << request.cmd;
       return {false, ""};
   }
   
@@ -180,7 +178,6 @@ client_session::do_get_proxy_addr(yield_context &yield)
   }
   else
   {
-    LOG(WARNING) << "unsupported address type: " << request.addr_type;
     return {false, ""};
   }
   
@@ -211,12 +208,11 @@ client_session::do_get_proxy_addr(yield_context &yield)
 }
 
 std::pair<bool, std::string>
-client_session::do_local_socks5(
-  yield_context &yield)
+client_session::do_local_socks5(yield_context yield)
 {
-  if ( do_socks5_auth(yield))
+  if ( local_socks_auth(yield))
   {
-    return do_get_proxy_addr(yield);
+    return get_host_service(yield);
   }
   else
   {
@@ -224,108 +220,112 @@ client_session::do_local_socks5(
   }
 }
 
-void client_session::start(yield_context &yield)
+void client_session::start(yield_context yield)
 {
   try
   {
     auto[success, addr_port] = do_local_socks5(yield);
     if ( !success )
+    {
+      LOG(WARNING) << "do local socks5 failed";
       return;
+    }
+    LOG(INFO) << "connect to: " << addr_port;
     remote.async_connect(addr, yield);
-    LOG(INFO) << "socket connect to " << addr_port;
-    send_handshake(yield, std::move(addr_port));
+    handshake(yield, std::move(addr_port));
+    spawn(
+      strand,
+      [this, p = shared_from_this()](yield_context yield)
+      {
+        do_forward_local_to_remote(yield);
+      });
+    spawn(
+      strand,
+      [this, p = shared_from_this()](yield_context yield)
+      {
+        do_forward_remote_to_local(yield);
+      });
   }
   catch ( system_error &e )
   {
-    LOG(WARNING) << e.what();
+    LOG(WARNING) << __LINE__ << e.what();
     return;
   }
-  auto p = shared_from_this();
-  spawn(
-    yield,
-    [this, p](yield_context yield)
-    {
-      do_forward_local_to_remote(yield);
-    });
-  spawn(
-    yield,
-    [this, p](yield_context yield)
-    {
-      do_forward_remote_to_local(yield);
-    });
+  
 }
 
 client_session::client_session(
+  io_context::strand &strand_,
   ip::tcp::socket local_,
   const ip::tcp::endpoint &addr_,
-  const CryptoPP::SecByteBlock& key_) :
+  const std::vector<uint8_t> &key_) :
+  strand(strand_),
   local(std::move(local_)),
   remote(local.get_executor().context()),
-  addr(std::move(addr_)),
-  key(key_),
-  iv(8)
+  addr(addr_),
+  key(key_)
 {
 }
 
-void client_session::do_forward_local_to_remote(yield_context &yield)
+
+void client_session::handshake(yield_context yield, std::string host_service)
 {
-  try
-  {
-    std::vector<uint8_t> buf;
-    while ( true )
-    {
-      auto n_read = async_read(local, dynamic_buffer(buf), yield);
-      encrypt.ProcessString(buf.data(), n_read);
-      async_write(remote, buffer(buf), transfer_all(), yield);
-      buf.clear();
-    }
-    
-  }
-  catch (system_error & e)
-  {
-    local.close();
-    remote.close();
-    LOG(WARNING) << e.what();
-  }
+  Botan::AutoSeeded_RNG rng;
+  std::vector<uint8_t> send_iv(8);
+  std::vector<uint8_t> recv_iv(8);
+  rng.randomize(send_iv.data(), send_iv.size());
+  
+  send_cipher = Botan::StreamCipher::create_or_throw("ChaCha(20)");
+  send_cipher->set_key(key.data(), key.size());
+  send_cipher->set_iv(send_iv.data(), send_iv.size());
+  
+  uint16_t size = send_iv.size() + host_service.size();
+  std::vector<uint8_t> temp(host_service.begin(), host_service.end());
+  send_cipher->encrypt(temp);
+  
+  std::vector<const_buffer> buffers;
+  buffers.emplace_back(buffer(&size, sizeof(size)));
+  buffers.emplace_back(buffer(send_iv));
+  buffers.emplace_back(buffer(temp));
+  
+  async_write(remote, buffers, transfer_all(), yield);
+  async_read(remote, buffer(recv_iv), transfer_all(), yield);
+  
+  recv_cipher = Botan::StreamCipher::create_or_throw("ChaCha(20)");
+  recv_cipher->set_key(key.data(), key.size());
+  recv_cipher->set_iv(recv_iv.data(), recv_iv.size());
 }
 
-void client_session::send_handshake(yield_context &yield, std::string addr_port)
+void client_session::do_forward_remote_to_local(yield_context yield)
 {
-  AutoSeededRandomPool rng;
-  rng.GenerateBlock(iv.data(), iv.size());
-  
-  encrypt.SetKeyWithIV(key.data(), key.size(), iv.data(), iv.size());
-  decrypt.SetKeyWithIV(key.data(), key.size(), iv.data(), iv.size());
-  
-  encrypt.ProcessString((byte *) addr_port.data(), addr_port.size());
-  uint16_t size = iv.size() + addr_port.size();
-  
-  std::vector<const_buffer> sequence;
-  sequence.emplace_back(buffer(&size, sizeof(size)));
-  sequence.emplace_back(buffer(iv.data(), iv.size()));
-  sequence.emplace_back(buffer(addr_port));
-  async_write(remote, sequence, transfer_all(), yield);
+  std::vector<uint8_t> buf(2048);
+  auto ec = pair(remote, local, yield, buf, [this](mutable_buffer b)
+  {
+    recv_cipher->cipher1((uint8_t *)b.data(),b.size());
+  });
+  LOG(INFO) << ec.message();
+  local.close();
+  remote.close();
 }
 
-void client_session::do_forward_remote_to_local(yield_context &yield)
+void client_session::do_forward_local_to_remote(yield_context yield)
 {
-  try
+  std::vector<uint8_t> buf(2048);
+  auto ec = pair(local, remote, yield, buf, [this](mutable_buffer b)
   {
-    std::vector<uint8_t> buf;
-    while ( true )
-    {
-      auto n_read = async_read(remote, dynamic_buffer(buf), yield);
-      decrypt.ProcessString(buf.data(), n_read);
-      async_write(local, buffer(buf), transfer_all(), yield);
-      buf.clear();
-    }
-  }
-  catch (system_error & e)
+    send_cipher->cipher1((uint8_t *)b.data(),b.size());
+  });
+  LOG(INFO) << ec.message();
+  local.close();
+  remote.close();
+}
+
+void client_session::go()
+{
+  spawn(strand, [this, p = shared_from_this()](yield_context yield)
   {
-    local.close();
-    remote.close();
-    LOG(WARNING) << e.what();
-  }
+    start(yield);
+  });
 }
 
 }
