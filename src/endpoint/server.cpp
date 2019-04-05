@@ -21,9 +21,9 @@ void server::start()
 {
   spawn(strand, [this](yield_context yield)
   {
-    async_accept(yield, [this](ip::tcp::socket socket)
+    async_accept(yield, [this](ip::tcp::socket socket)  -> std::shared_ptr<server_session>
     {
-      std::make_shared<server_session>(
+      return std::make_shared<server_session>(
         strand,
         std::move(socket),
         key

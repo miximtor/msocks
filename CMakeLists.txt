@@ -30,6 +30,8 @@ find_package(Botan2 2.8.0 REQUIRED)
 
 add_definitions(-DBOOST_ASIO_NO_DEPRECATED)
 add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
+add_definitions(-DGLOG_NO_ABBREVIATED_SEVERITIES)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 if (UNIX)
     install(TARGETS ${PROJECT_NAME} DESTINATION /usr/bin)
