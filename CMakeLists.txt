@@ -13,7 +13,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -Wall")
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/modules)
 
-find_package(Boost 1.69 COMPONENTS system coroutine)
+find_package(Boost 1.67 COMPONENTS system coroutine)
 if (NOT Boost_FOUND)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost)
 endif()
