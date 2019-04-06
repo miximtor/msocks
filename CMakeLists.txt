@@ -34,5 +34,5 @@ add_definitions(-DGLOG_NO_ABBREVIATED_SEVERITIES)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 if (UNIX)
-    install(TARGETS ${PROJECT_NAME} DESTINATION /usr/bin)
+    install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif()

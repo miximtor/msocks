@@ -1,0 +1,7 @@
+{
+  "server": "0.0.0.0",
+  "server_port": 6999,
+  "password": "123456",
+  "method": "ChaCha(20)",
+  "speed_limit" : 1024
+}

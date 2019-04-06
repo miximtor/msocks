@@ -14,12 +14,14 @@ namespace msocks
 server_session::server_session(
   io_context::strand &strand_,
   ip::tcp::socket local_,
-  const std::vector<uint8_t> &key_) :
+  const std::vector<uint8_t> &key_,
+  std::shared_ptr<utility::limiter> limiter_):
   strand(strand_),
   local(std::move(local_)),
   remote(local.get_executor().context()),
   key(key_),
-  resolver(strand.context())
+  resolver(strand.context()),
+  limiter(limiter_)
 {}
 
 void server_session::start(yield_context yield)
@@ -51,8 +53,8 @@ void server_session::start(yield_context yield)
 
 void server_session::do_forward_local_to_remote(yield_context yield)
 {
-  std::vector<uint8_t> buf(2048);
-  auto ec = pair(local, remote, yield, buf, [this](mutable_buffer b)
+  std::vector<uint8_t> buf(128);
+  auto ec = pair(local, remote, yield, buf, [this,yield](mutable_buffer b)
   {
     recv_cipher->cipher1((uint8_t *) b.data(), b.size());
   });
@@ -63,9 +65,10 @@ void server_session::do_forward_local_to_remote(yield_context yield)
 
 void server_session::do_forward_remote_to_local(yield_context yield)
 {
-  std::vector<uint8_t> buf(2048);
-  auto ec = pair(remote, local, yield, buf, [this](mutable_buffer b)
+  std::vector<uint8_t> buf(128);
+  auto ec = pair(remote, local, yield, buf, [this,yield](mutable_buffer b)
   {
+    limiter->async_get(b.size(),yield);
     send_cipher->cipher1((uint8_t *) b.data(), b.size());
   });
   LOG(INFO) << ec.message();

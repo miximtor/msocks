@@ -298,7 +298,7 @@ void client_session::handshake(yield_context yield, std::string host_service)
 
 void client_session::do_forward_remote_to_local(yield_context yield)
 {
-  std::vector<uint8_t> buf(2048);
+  std::vector<uint8_t> buf(128);
   auto ec = pair(remote, local, yield, buf, [this](mutable_buffer b)
   {
     recv_cipher->cipher1((uint8_t *)b.data(),b.size());
@@ -310,7 +310,7 @@ void client_session::do_forward_remote_to_local(yield_context yield)
 
 void client_session::do_forward_local_to_remote(yield_context yield)
 {
-  std::vector<uint8_t> buf(2048);
+  std::vector<uint8_t> buf(128);
   auto ec = pair(local, remote, yield, buf, [this](mutable_buffer b)
   {
     send_cipher->cipher1((uint8_t *)b.data(),b.size());

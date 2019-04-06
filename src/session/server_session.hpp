@@ -2,8 +2,10 @@
 
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <usings.hpp>
+#include <utility/limiter.hpp>
 #include <botan/stream_cipher.h>
+#include <usings.hpp>
+
 
 namespace msocks
 {
@@ -16,7 +18,8 @@ public:
   server_session(
     io_context::strand &strand_,
     ip::tcp::socket local_,
-    const std::vector<uint8_t> &key_
+    const std::vector<uint8_t> &key_,
+    std::shared_ptr<utility::limiter> limiter_
   );
   
   void go();
@@ -36,7 +39,7 @@ private:
   
   std::unique_ptr<Botan::StreamCipher> send_cipher;
   std::unique_ptr<Botan::StreamCipher> recv_cipher;
-  
+  std::shared_ptr<utility::limiter> limiter;
 };
 
 }

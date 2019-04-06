@@ -13,7 +13,8 @@ server::server(
   const ip::tcp::endpoint &listen,
   const std::vector<uint8_t> &key_) :
   endpoint(listen),
-  key(key_)
+  key(key_),
+  limiter(new utility::limiter(strand,512*1024))
 {
 }
 
@@ -21,15 +22,17 @@ void server::start()
 {
   spawn(strand, [this](yield_context yield)
   {
-    async_accept(yield, [this](ip::tcp::socket socket)  -> std::shared_ptr<server_session>
+    async_accept(yield, [this](ip::tcp::socket socket)
     {
       return std::make_shared<server_session>(
         strand,
         std::move(socket),
-        key
+        key,
+        limiter
       );
     });
   });
+  limiter->start();
   context.run();
 }
 }

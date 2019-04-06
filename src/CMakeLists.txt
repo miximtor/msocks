@@ -17,7 +17,7 @@ set(CONFIG_FILE
 set(UTILITY_FILE
         utility/socks_constants.hpp
         utility/socket_pair.hpp
-        utility/signal_handle.hpp)
+        utility/signal_handle.hpp utility/limiter.hpp)
 
 include_directories(${PROJECT_SOURCE_DIR}/src/)
 include_directories(${BOTAN2_INCLUDE_DIRS})
