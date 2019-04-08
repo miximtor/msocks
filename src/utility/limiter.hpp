@@ -50,12 +50,14 @@ public:
     {
       while ( true )
       {
+        
         if ( queue.empty())
         {
           signal.expires_from_now(boost::posix_time::pos_infin);
           error_code ignored_ec;
           signal.async_wait(yield[ignored_ec]);
         }
+        
         timer.expires_from_now(boost::posix_time::seconds(1));
         timer.async_wait(yield);
         available += increment;
@@ -77,7 +79,6 @@ private:
   std::size_t increment;
   std::size_t available;
   std::queue<std::pair<std::size_t, Handler>> queue;
-  
 };
 
 }

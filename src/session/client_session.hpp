@@ -3,13 +3,14 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <botan/stream_cipher.h>
+#include "session.hpp"
 #include <usings.hpp>
 
 
 namespace msocks
 {
-class client_session :
-  public noncopyable,
+class client_session final:
+  public session,
   public std::enable_shared_from_this<client_session>
 {
 public:
@@ -22,30 +23,21 @@ public:
   );
   
   void go();
-
+  
 private:
+  
+  using Result = async_result<yield_context, void(error_code)>;
+  using Handler = Result::completion_handler_type;
+  
   void start(yield_context yield);
+
+  void async_handshake(const std::string &host_service, yield_context yield);
   
-  std::pair<bool, std::string> do_local_socks5(yield_context yield);
+  void do_async_handshake(Handler handler,const std::string & host_service,yield_context yield);
   
-  bool local_socks_auth(yield_context yield);
-  
-  std::pair<bool, std::string> get_host_service(yield_context yield);
-  
-  void handshake(yield_context yield, std::string host_service);
-  
-  void do_forward_local_to_remote(yield_context yield);
-  
-  void do_forward_remote_to_local(yield_context yield);
-  
-  io_context::strand &strand;
-  ip::tcp::socket local;
-  ip::tcp::socket remote;
+  void fwd_local_remote(yield_context yield);
+  void fwd_remote_local(yield_context yield);
   const ip::tcp::endpoint &addr;
-  const std::vector<uint8_t> &key;
-  
-  std::unique_ptr<Botan::StreamCipher> send_cipher;
-  std::unique_ptr<Botan::StreamCipher> recv_cipher;
   
 };
 }

@@ -12,7 +12,7 @@ error_code pair(
   ip::tcp::socket &src,
   ip::tcp::socket &dst,
   yield_context yield,
-  std::vector<uint8_t> &buf,
+  mutable_buffer buf,
   Transform transform
 )
 {

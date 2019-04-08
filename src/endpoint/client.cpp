@@ -1,7 +1,6 @@
 #include "client.hpp"
 #include <boost/asio/spawn.hpp>
 #include <session/client_session.hpp>
-#include <glog/logging.h>
 #include <usings.hpp>
 
 namespace msocks
@@ -21,12 +20,14 @@ void client::start()
 {
   spawn(strand, [this](yield_context yield)
   {
-    async_accept(yield,[this](ip::tcp::socket socket) -> std::shared_ptr<client_session>
-    {
-      return std::make_shared<client_session>(
-        strand,std::move(socket),remote,key
-      );
-    });
+    async_accept(
+      yield,
+      [this](ip::tcp::socket socket)
+      {
+        return std::make_shared<client_session>(
+          strand, std::move(socket), remote, key
+        );
+      });
   });
   context.run();
 }

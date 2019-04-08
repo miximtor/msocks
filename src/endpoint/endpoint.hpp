@@ -5,6 +5,7 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <usings.hpp>
+#include <spdlog/spdlog.h>
 
 namespace msocks
 {
@@ -22,12 +23,20 @@ protected:
   template <typename SessionFactory>
   void async_accept(yield_context yield,SessionFactory factory)
   {
-    while (true)
+    try
     {
-      ip::tcp::socket socket(context);
-      acceptor.async_accept(socket,yield);
-      auto session = factory(std::move(socket));
-      session->go();
+      while (true)
+      {
+        ip::tcp::socket socket(context);
+        acceptor.async_accept(socket,yield);
+        auto session = factory(std::move(socket));
+        session->go();
+      }
+    } catch (system_error & e)
+    {
+      auto ep = acceptor.local_endpoint();
+      std::string addr_port = ep.address().to_string() + ":"+std::to_string(ep.port());
+      spdlog::error("{} error: {}",addr_port,e.what());
     }
   }
   

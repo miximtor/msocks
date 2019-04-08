@@ -10,7 +10,7 @@ namespace msocks
 class server : public endpoint
 {
 public:
-  server(const ip::tcp::endpoint &listen,const std::vector<uint8_t> & key_);
+  server(const ip::tcp::endpoint &listen,const std::vector<uint8_t> & key_,std::size_t limit);
   void start();
 private:
   const std::vector<uint8_t> &key;

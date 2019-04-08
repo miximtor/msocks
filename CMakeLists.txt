@@ -2,37 +2,34 @@ cmake_minimum_required(VERSION 3.13)
 project(msocks)
 
 set(CMAKE_CXX_STANDARD 17)
-
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
-
+set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
+set(Boost_ARCHITECTURE -x64)
 set(Boost_USE_STATIC_RUNTIME ON)
-
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -Wall")
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/modules)
 
-find_package(Boost 1.66 COMPONENTS system coroutine)
+find_package(Botan2 2.10.0 REQUIRED)
+find_package(Boost 1.69 COMPONENTS system coroutine random REQUIRED)
+find_package(glog REQUIRED)
+include_directories(${GLOG_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${BOTAN2_INCLUDE_DIRS})
+include_directories(third_party/spdlog/include)
+include_directories(src)
 
-if (NOT Boost_FOUND)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost)
-endif()
+add_definitions(-DBOOST_ASIO_NO_DEPRECATED)
+add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
 
-if(WIN32)
-    add_definitions(-DMSOCKS_WINDOWS)
+if (MSVC)
+    add_definitions(-D_WIN32_WINNT=0x0A00)
+    add_definitions(-DMSOCKS_MSVC)
+elseif(MINGW)
+    add_definitions(-DMSOCKS_MINGW)
 elseif(UNIX)
     add_definitions(-DMSOCKS_UNIX)
 endif()
 
-find_package(Glog REQUIRED)
-find_package(Botan2 2.8.0 REQUIRED)
-
-add_definitions(-DBOOST_ASIO_NO_DEPRECATED)
-add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
-add_definitions(-DGLOG_NO_ABBREVIATED_SEVERITIES)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
-if (UNIX)
-    install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX})
-endif()
+

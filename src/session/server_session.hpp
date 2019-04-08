@@ -4,14 +4,15 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <utility/limiter.hpp>
 #include <botan/stream_cipher.h>
+#include "session.hpp"
 #include <usings.hpp>
 
 
 namespace msocks
 {
 
-class server_session :
-  public noncopyable,
+class server_session final :
+  public session,
   public std::enable_shared_from_this<server_session>
 {
 public:
@@ -24,21 +25,21 @@ public:
   
   void go();
 private:
+  
+  using Result = async_result<yield_context, void(error_code,std::pair<std::string,std::string>)>;
+  using Handler = Result::completion_handler_type;
+  
   void start(yield_context yield);
   
-  void do_forward_local_to_remote(yield_context yield);
+  void fwd_local_remote(yield_context yield);
   
-  void do_forward_remote_to_local(yield_context yield);
+  void fwd_remote_local(yield_context yield);
   
-  std::pair<std::string, std::string> handshake(yield_context yield);
-  io_context::strand &strand;
-  ip::tcp::socket local;
-  ip::tcp::socket remote;
-  const std::vector<uint8_t> &key;
+  Result::return_type async_handshake(yield_context yield);
+  
+  void do_async_handshake(Handler handler,yield_context yield);
+  
   ip::tcp::resolver resolver;
-  
-  std::unique_ptr<Botan::StreamCipher> send_cipher;
-  std::unique_ptr<Botan::StreamCipher> recv_cipher;
   std::shared_ptr<utility::limiter> limiter;
 };
 

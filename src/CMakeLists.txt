@@ -3,12 +3,15 @@ set(SESSION_FILE
         session/client_session.cpp
         session/server_session.cpp
         session/server_session.hpp
-        )
+        session/session.hpp)
 
 set(ENDPOINT_FILE
         endpoint/server.cpp
         endpoint/server.hpp
-        endpoint/client.cpp endpoint/client.hpp endpoint/endpoint.hpp)
+        endpoint/client.cpp
+        endpoint/client.hpp
+        endpoint/endpoint.hpp
+        )
 
 set(CONFIG_FILE
         config/config.hpp
@@ -17,10 +20,10 @@ set(CONFIG_FILE
 set(UTILITY_FILE
         utility/socks_constants.hpp
         utility/socket_pair.hpp
-        utility/signal_handle.hpp utility/limiter.hpp)
+        utility/signal_handle.hpp
+        utility/limiter.hpp
+        utility/local_socks5.hpp utility/socks_erorr.hpp)
 
-include_directories(${PROJECT_SOURCE_DIR}/src/)
-include_directories(${BOTAN2_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME}
         ${SESSION_FILE}
@@ -30,8 +33,10 @@ add_executable(${PROJECT_NAME}
         main.cpp
         )
 
-IF(WIN32)
-    target_link_libraries(${PROJECT_NAME} ${GLOG_LIBRARIES} ${BOTAN2_LIBRARIES} boost_system-mt boost_coroutine-mt ws2_32 wsock32 )
-ELSE(WIN32)
-    target_link_libraries(${PROJECT_NAME} ${GLOG_LIBRARIES} ${BOTAN2_LIBRARIES} boost_system boost_coroutine pthread)
-ENDIF(WIN32)
+
+IF (WIN32)
+    target_link_options(${PROJECT_NAME} PRIVATE -fstack-protector)
+    target_link_libraries(${PROJECT_NAME} Botan2::Botan2 Boost::system Boost::random Boost::coroutine ws2_32 wsock32)
+ELSE ()
+    target_link_libraries(${PROJECT_NAME} Botan2::Botan2 Boost::system Boost::random Boost::coroutine pthread)
+ENDIF ()
