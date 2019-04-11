@@ -13,12 +13,7 @@ server::server(
 	endpoint(listen),
 	key(key_),
 	limiter(new utility::limiter(strand, limit * 1024)),
-	session_pool(
-		context,
-		[this](ip::tcp::socket s) -> server_session *
-		{
-			return new server_session(strand,std::move(s),key,limiter);
-		})
+	session_pool(context)
 {
 }
 
@@ -30,7 +25,12 @@ void server::start()
 			yield,
 			[this](ip::tcp::socket socket)
 			{
-				return session_pool.take(std::move(socket));
+				return session_pool.take(
+					std::ref(strand),
+					std::move(socket),
+					std::cref(key),
+					limiter
+				);
 			});
 	});
 	limiter->start();

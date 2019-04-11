@@ -30,12 +30,6 @@ public:
 	{
 		return session_uuid;
 	}
-	
-	void reuse(ip::tcp::socket s)
-	{
-		local = std::move(s);
-		remote = ip::tcp::socket(local.get_executor().context());
-	}
 
 
 protected:

@@ -12,9 +12,6 @@
 namespace msocks
 {
 
-class server_session;
-
-
 class server_session final :
 	public session,
 	public std::enable_shared_from_this<server_session>
@@ -29,9 +26,20 @@ public:
 	friend class server;
 	
 	void go();
+	
+	void notify_reuse(const io_context::strand &strand_,
+										ip::tcp::socket local_,
+										const std::vector<uint8_t> &key_,
+										const std::shared_ptr<utility::limiter> &limiter_)
+	{
+		(void) strand_;
+		(void) key_;
+		(void) limiter_;
+		local = std::move(local_);
+		remote = ip::tcp::socket(local.get_executor().context());
+	}
 
 private:
-	
 	
 	using Result = async_result<yield_context, void(error_code, std::pair<std::string, std::string>)>;
 	using Handler = Result::completion_handler_type;
@@ -48,6 +56,7 @@ private:
 	
 	std::shared_ptr<utility::limiter> limiter;
 };
+
 
 }
 
