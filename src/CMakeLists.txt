@@ -34,8 +34,9 @@ add_executable(${PROJECT_NAME}
         )
 
 
+target_link_options(${PROJECT_NAME} PRIVATE -fstack-protector)
+
 IF (WIN32)
-    target_link_options(${PROJECT_NAME} PRIVATE -fstack-protector)
     target_link_libraries(${PROJECT_NAME} Botan2::Botan2 Boost::system Boost::random Boost::coroutine ws2_32 wsock32)
 ELSE ()
     target_link_libraries(${PROJECT_NAME} Botan2::Botan2 Boost::system Boost::random Boost::coroutine pthread)

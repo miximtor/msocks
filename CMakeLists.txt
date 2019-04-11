@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.9.4)
 project(msocks)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -7,11 +7,11 @@ set(Boost_USE_STATIC_LIBS ON)
 set(Boost_ARCHITECTURE -x64)
 set(Boost_USE_STATIC_RUNTIME ON)
 
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/modules)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 find_package(Botan2 2.10.0 REQUIRED)
 find_package(Boost 1.69 COMPONENTS system coroutine random REQUIRED)
-find_package(glog REQUIRED)
+
 include_directories(${GLOG_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${BOTAN2_INCLUDE_DIRS})
