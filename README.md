@@ -4,7 +4,7 @@ For scientific internet surfing
 [![Build Status](https://travis-ci.org/miximtor/msocks.svg?branch=master)](https://travis-ci.org/miximtor/msocks)
 
 
-####Dependencies:
+### dependencies:
 
   [Boost](https://www.boost.org/) > 1.69
   
@@ -19,7 +19,7 @@ For scientific internet surfing
 
   [spdlog](https://github.com/gabime/spdlog) (header only)
   
-##How to build
+### How to build
 
 ```
 git clone https://github.com/miximtor/msocks.git
@@ -30,7 +30,7 @@ cmake . -DCMAKE_BUILD_TYPE=Release
 make -j8 && make install
 ```
 
-##How to run
+### How to run
 
 Run msocks as server:
 
@@ -44,7 +44,7 @@ Or run msocks as client:
 msocks c <server-ip> <server-port> <encrypt-key> 
 `
 
-##Todo
+### Todo
 
 1) add systemd config
 
