@@ -45,9 +45,9 @@ int main(int argc, char *argv[])
       client.start();
     }
   }
-  catch (std::exception &e)
+  catch (boost::exception &e)
   {
-    spdlog::error("main error: {}",e.what());
+    spdlog::error("main error: {}",boost::diagnostic_information(e,false));
     exit(-1);
   }
   catch (...)

@@ -3,7 +3,9 @@ set(SESSION_FILE
         session/client_session.cpp
         session/server_session.cpp
         session/server_session.hpp
-        session/session.hpp)
+        session/session.hpp
+        session/pool.hpp
+        )
 
 set(ENDPOINT_FILE
         endpoint/server.cpp
@@ -22,10 +24,13 @@ set(UTILITY_FILE
         utility/socket_pair.hpp
         utility/signal_handle.hpp
         utility/limiter.hpp
-        utility/local_socks5.hpp utility/socks_erorr.hpp)
+        utility/local_socks5.hpp
+        utility/socks_erorr.hpp
+        )
 
 
-add_executable(${PROJECT_NAME}
+add_executable(
+        ${PROJECT_NAME}
         ${SESSION_FILE}
         ${UTILITY_FILE}
         ${ENDPOINT_FILE}
