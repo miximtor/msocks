@@ -6,7 +6,7 @@ For scientific internet surfing
 
 ### dependencies:
 
-  [Boost](https://www.boost.org/) > 1.69
+  [Boost](https://www.boost.org/) >=  1.69
   
     required boost components: 
         system 
@@ -15,7 +15,7 @@ For scientific internet surfing
         asio
         random
         
-  [libbotan](https://botan.randombit.net/) > 2.10.0
+  [libbotan](https://botan.randombit.net/) >= 2.10.0
 
   [spdlog](https://github.com/gabime/spdlog) (header only)
   

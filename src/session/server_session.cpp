@@ -17,7 +17,6 @@ server_session::server_session(
   const std::vector<uint8_t> &key_,
   std::shared_ptr<utility::limiter> limiter_) :
   session(strand_, std::move(local_), key_),
-  resolver(strand.context()),
   limiter(std::move(limiter_))
 {}
 
@@ -26,6 +25,7 @@ void server_session::start(yield_context yield)
   try
   {
     auto[host, service] = async_handshake(yield);
+		ip::tcp::resolver resolver(local.get_executor().context());
     auto result = resolver.async_resolve(host, service, yield);
     remote.async_connect(*result.begin(), yield);
     spawn(
