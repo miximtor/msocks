@@ -29,8 +29,8 @@ before_install:
 install:
   - DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
   - mkdir -p ${DEPS_DIR} && cd ${DEPS_DIR}
-  - BOOST_DIR=${TRAVIS_BUILD_DIR}/deps/boost_1_69_0
-  - BOTAN_DIR=${TRAVIS_BUILD_DIR}/deps/botan-2.10.0
+  - BOOST_DIR=${TRAVIS_BUILD_DIR}/deps/boost
+  - BOTAN_DIR=${TRAVIS_BUILD_DIR}/deps/botan
   - |
     if [[ -z "$(ls -A ${BOOST_DIR})" ]]; then
       cd ${TRAVIS_BUILD_DIR}
