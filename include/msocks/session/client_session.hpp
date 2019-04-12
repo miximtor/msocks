@@ -3,8 +3,8 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <botan/stream_cipher.h>
-#include "session.hpp"
-#include <usings.hpp>
+#include <msocks/session/session.hpp>
+#include <msocks/usings.hpp>
 
 
 namespace msocks

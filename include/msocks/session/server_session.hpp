@@ -1,13 +1,11 @@
-#include <utility>
-
 #pragma once
 
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <utility/limiter.hpp>
 #include <botan/stream_cipher.h>
-#include <usings.hpp>
-#include "session.hpp"
+#include <msocks/utility/limiter.hpp>
+#include <msocks/usings.hpp>
+#include <msocks/session/session.hpp>
 
 namespace msocks
 {
@@ -23,21 +21,13 @@ public:
 		const std::vector<uint8_t> &key_,
 		std::shared_ptr<utility::limiter> limiter_);
 	
-	friend class server;
-	
 	void go();
 	
-	void notify_reuse(const io_context::strand &strand_,
-										ip::tcp::socket local_,
-										const std::vector<uint8_t> &key_,
-										const std::shared_ptr<utility::limiter> &limiter_)
-	{
-		(void) strand_;
-		(void) key_;
-		(void) limiter_;
-		local = std::move(local_);
-		remote = ip::tcp::socket(local.get_executor().context());
-	}
+	void notify_reuse(
+		const io_context::strand &strand_,
+		ip::tcp::socket local_,
+		const std::vector<uint8_t> &key_,
+		const std::shared_ptr<utility::limiter> &limiter_);
 
 private:
 	
@@ -56,7 +46,6 @@ private:
 	
 	std::shared_ptr<utility::limiter> limiter;
 };
-
 
 }
 

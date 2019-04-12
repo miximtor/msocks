@@ -2,11 +2,11 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <utility/limiter.hpp>
-#include <session/pool.hpp>
-#include <session/server_session.hpp>
-#include "endpoint.hpp"
-#include <usings.hpp>
+#include <msocks/session/pool.hpp>
+#include <msocks/utility/limiter.hpp>
+#include <msocks/session/server_session.hpp>
+#include <msocks/endpoint/endpoint.hpp>
+#include <msocks/usings.hpp>
 namespace msocks
 {
 class server : public endpoint

@@ -1,8 +1,10 @@
 #include <vector>
 #include <string>
-#include <endpoint/server.hpp>
-#include <endpoint/client.hpp>
-#include <config/config.hpp>
+
+#include <msocks/endpoint/server.hpp>
+#include <msocks/endpoint/client.hpp>
+#include <msocks/config.hpp>
+
 #include <botan/sha2_32.h>
 #include <spdlog/spdlog.h>
 
@@ -47,13 +49,13 @@ int main(int argc, char *argv[])
   }
   catch (boost::exception &e)
   {
-    spdlog::error("main error: {}",boost::diagnostic_information(e,false));
-    exit(-1);
+    spdlog::error("main error: {}",boost::diagnostic_information(e));
+    return -1;
   }
-  catch (...)
-  {
-    spdlog::error("main error: {}","unknown exception");
-    exit(-2);
-  }
+  catch (std::exception &e)
+	{
+		spdlog::error("main error: {}",e.what());
+		return -2;
+	}
   return 0;
 }
