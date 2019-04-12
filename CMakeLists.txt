@@ -48,4 +48,4 @@ add_executable(msocks
         src/main.cpp)
 
 target_link_options(msocks PRIVATE -fstack-protector)
-target_link_libraries(msocks Boost::coroutine Boost::random Boost::system Botan2::Botan2 ${WIN_EXTRA_LIB})
+target_link_libraries(msocks Boost::coroutine Boost::random Boost::system Botan2::Botan2 ${CMAKE_THREAD_LIBS_INIT} ${WIN_EXTRA_LIB})
