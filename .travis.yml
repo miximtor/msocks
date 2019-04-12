@@ -1,58 +1,31 @@
-language: c++
-compiler: gcc
-
+sudo: required
+language: cpp
 dist: trusty
+
+os:
+  - linux
+
+compiler:
+  - g++
+  - clang++
+
+arch:
+  packages:
+    - cmake
+    - gcc
+    - clang
+    - boost
+    - botan
+
+  script:
+    - mkdir build && cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Debug
+    - make -j4
+
+script:
+  - "curl -s https://raw.githubusercontent.com/Jackarain/arch-travis/master/arch-travis.sh | bash"
 
 branches:
   only:
     - master
 
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-    packages:
-      - g++-8
-      - cmake
-
-os: linux
-
-cache:
-  directories:
-    - ${TRAVIS_BUILD_DIR}/deps/boost
-    - ${TRAVIS_BUILD_DIR}/deps/botan
-
-
-before_install:
-  - export CC=gcc-8
-  - export CXX=g++-8
-install:
-  - DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
-  - mkdir -p ${DEPS_DIR} && cd ${DEPS_DIR}
-  - BOOST_DIR=${TRAVIS_BUILD_DIR}/deps/boost
-  - BOTAN_DIR=${TRAVIS_BUILD_DIR}/deps/botan
-  - |
-    if [[ -z "$(ls -A ${BOOST_DIR})" ]]; then
-      cd ${TRAVIS_BUILD_DIR}
-      echo -n "build boost 1.69.0"
-      wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz
-      tar -xf boost_1_69_0.tar.gz && cd boost_1_69_0
-      ./bootstrap.sh 2>&1 1>/dev/null
-      sudo ./b2 --prefix="${BOOST_DIR}" --with-context --with-coroutine --with-random --with-system variant=release link=static runtime-link=static threading=multi address-model=64 install -j8 2>&1 1>/dev/null
-      echo "     done"
-    fi
-  - |
-    if [[ -z "$(ls -A ${BOTAN_DIR})" ]]; then
-      cd ${TRAVIS_BUILD_DIR}
-      echo -n "build botan 2.10.0"
-      wget https://github.com/randombit/botan/archive/2.10.0.tar.gz -O botan-2.10.0.tar.gz
-      tar -xf botan-2.10.0.tar.gz && cd botan-2.10.0
-      ./configure.py --prefix="${BOTAN_DIR}" 2>&1 1>/dev/null
-      sudo make -j8 2>&1 1>/dev/null && sudo make install
-      echo "     done"
-    fi
-    cd ${TRAVIS_BUILD_DIR}
-  - export PATH=${PATH}:${BOOST_DIR}:${BOTAN_DIR}
-script:
-  - cmake .
-  - make -j8
