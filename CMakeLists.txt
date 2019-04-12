@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 find_package(Threads REQUIRED)
-find_package(Botan2 2.10.0 REQUIRED)
+find_package(Botan2 2.9.0 REQUIRED)
 find_package(Boost 1.69 COMPONENTS system coroutine random REQUIRED)
 if (BOTAN2_FOUND)
     message("Use Botan2: ${BOTAN2_LIBRARIES}")

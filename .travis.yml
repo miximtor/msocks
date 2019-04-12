@@ -2,6 +2,9 @@ sudo: required
 language: cpp
 dist: trusty
 
+git:
+  depth: 10
+
 os:
   - linux
 
