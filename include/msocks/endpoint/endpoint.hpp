@@ -4,7 +4,7 @@
 #include <boost/asio/strand.hpp>
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <usings.hpp>
+#include <msocks/usings.hpp>
 #include <spdlog/spdlog.h>
 
 namespace msocks

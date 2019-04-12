@@ -1,7 +1,6 @@
-#include "server.hpp"
-
 #include <boost/asio/spawn.hpp>
-#include <usings.hpp>
+#include <msocks/endpoint/server.hpp>
+#include <msocks/usings.hpp>
 
 namespace msocks
 {
@@ -13,7 +12,7 @@ server::server(
 	endpoint(listen),
 	key(key_),
 	limiter(new utility::limiter(strand, limit * 1024)),
-	session_pool(context)
+	session_pool(strand)
 {
 }
 

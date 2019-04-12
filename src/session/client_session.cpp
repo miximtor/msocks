@@ -1,11 +1,11 @@
-#include "client_session.hpp"
 #include <boost/asio/read.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/endian/conversion.hpp>
 #include <botan/auto_rng.h>
-#include <utility/socks_constants.hpp>
-#include <utility/socket_pair.hpp>
-#include <utility/local_socks5.hpp>
+#include <msocks/session/client_session.hpp>
+#include <msocks/utility/socks_constants.hpp>
+#include <msocks/utility/socket_pair.hpp>
+#include <msocks/utility/local_socks5.hpp>
 
 namespace msocks
 {

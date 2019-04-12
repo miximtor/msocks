@@ -1,7 +1,7 @@
-#include "client.hpp"
 #include <boost/asio/spawn.hpp>
-#include <session/client_session.hpp>
-#include <usings.hpp>
+#include <msocks/endpoint/client.hpp>
+#include <msocks/session/client_session.hpp>
+#include <msocks/usings.hpp>
 
 namespace msocks
 {

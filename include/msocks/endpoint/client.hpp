@@ -1,8 +1,7 @@
 #pragma once
 
 #include <boost/asio/ip/tcp.hpp>
-#include <usings.hpp>
-#include "endpoint.hpp"
+#include <msocks/endpoint/endpoint.hpp>
 namespace msocks
 {
 

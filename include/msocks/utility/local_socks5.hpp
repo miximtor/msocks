@@ -4,16 +4,12 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/write.hpp>
-#include <utility/socks_constants.hpp>
-#include <utility/socks_erorr.hpp>
+#include <msocks/utility/socks_constants.hpp>
+#include <msocks/utility/socks_erorr.hpp>
+#include <msocks/usings.hpp>
 #include <spdlog/spdlog.h>
-#include <usings.hpp>
 
-#if defined(MSOCKS_MINGW) || defined(MSOCKS_UNIX)
 #define MSOCKS_PACK(DEC) DEC __attribute__((__packed__))
-#else
-#define MSOCKS_PACK(DEC) __pragma(pack(push, 1)) DEC __pragma( pack(pop) )
-#endif
 
 namespace utility
 {
