@@ -8,7 +8,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 find_package(Threads REQUIRED)
 find_package(Botan2 2.9.0 REQUIRED)
-find_package(Boost 1.69 COMPONENTS system coroutine random REQUIRED)
+find_package(Boost 1.69 COMPONENTS system coroutine random thread REQUIRED)
 if (BOTAN2_FOUND)
     message("Use Botan2: ${BOTAN2_LIBRARIES}")
 endif()
@@ -48,4 +48,4 @@ add_executable(msocks
         src/main.cpp)
 
 target_link_options(msocks PRIVATE -fstack-protector)
-target_link_libraries(msocks Boost::coroutine Boost::random Boost::system Botan2::Botan2 ${CMAKE_THREAD_LIBS_INIT} ${WIN_EXTRA_LIB})
+target_link_libraries(msocks Boost::coroutine Boost::random Boost::system Boost::thread Botan2::Botan2 ${CMAKE_THREAD_LIBS_INIT} ${WIN_EXTRA_LIB})
