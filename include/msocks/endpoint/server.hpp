@@ -2,6 +2,7 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
+
 #include <msocks/session/pool.hpp>
 #include <msocks/utility/limiter.hpp>
 #include <msocks/session/server_session.hpp>
@@ -18,6 +19,7 @@ private:
   const std::vector<uint8_t> &key;
   std::shared_ptr<utility::limiter> limiter;
 	pool<server_session> session_pool;
+	signal_set signal_dealer;
 };
 }
 

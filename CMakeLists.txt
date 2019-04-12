@@ -49,3 +49,8 @@ add_executable(msocks
 
 target_link_options(msocks PRIVATE -fstack-protector)
 target_link_libraries(msocks Boost::coroutine Boost::random Boost::system Boost::thread Botan2::Botan2 ${CMAKE_THREAD_LIBS_INIT} ${WIN_EXTRA_LIB})
+
+if (UNIX)
+    install(TARGETS msocks DESTINATION  ${CMAKE_INSTALL_BINDIR})
+    install(FILES daemon/msocksd.service /etc/systemd/system/)
+endif()
