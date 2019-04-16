@@ -34,3 +34,8 @@
 # Clion build outputs
 .idea*
 cmake-build-*
+
+#Visual Studio build outputs
+
+CMakeSettings.json
+.vs*
