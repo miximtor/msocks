@@ -1,61 +1,52 @@
-#include <vector>
-#include <string>
-
-#include <msocks/endpoint/server.hpp>
-#include <msocks/endpoint/client.hpp>
-#include <msocks/config.hpp>
-
-#include <botan/sha2_32.h>
 #include <spdlog/spdlog.h>
 
-msocks::config parse_config(int argc,char *argv[])
-{
-  msocks::config config;
-  return config;
-}
+#include <msocks/endpoint/server_endpoint.hpp>
+#include <msocks/endpoint/client_endpoint.hpp>
+#include <msocks/session/pool.hpp>
+#include <boost/asio/io_context.hpp>
+
+#include <botan/sha2_32.h>
 
 void log_setup()
 {
-  spdlog::set_pattern("[%l] %v");
+	spdlog::set_pattern("[%l] %v");
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-  log_setup();
-  try
-  {
-    auto config = parse_config(argc, argv);
-    using namespace std::string_literals;
-    std::string ip = argv[2];
-    unsigned short port = std::stoi(argv[3]);
-    ip::tcp::endpoint listen(ip::make_address_v4(ip), port);
-    std::string password = argv[4];
-    Botan::SHA_256 sha256;
-    sha256.update(password);
-    std::vector<uint8_t> key;
-    sha256.final(key);
-    if ( argv[1] == "s"s )
-    {
-      std::size_t limit = std::stoull(argv[5]);
-      msocks::server server(listen, key,limit);
-      server.start();
-    }
-    else if ( argv[1] == "c"s )
-    {
-      ip::tcp::endpoint local_ep(ip::make_address("127.0.0.1"), 1081);
-      msocks::client client(local_ep, listen, key);
-      client.start();
-    }
-  }
-  catch (boost::exception &e)
-  {
-    spdlog::error("main error: {}",boost::diagnostic_information(e));
-    return -1;
-  }
-  catch (std::exception &e)
+	io_context ioc;
+	Botan::SHA_256 sha256;
+	sha256.update(std::string(argv[4]));
+	std::vector<uint8_t> key;
+	sha256.final(key);
+	if (!strcmp(argv[1], "s"))
 	{
-		spdlog::error("main error: {}",e.what());
-		return -2;
+		msocks::pool<msocks::server_session> pool(ioc);
+		msocks::server_endpoint_config config;
+		config.no_delay = true;
+		config.server_address = argv[2];
+		config.server_port = std::stoi(argv[3]);
+		config.key = key;
+		config.speed_limit = std::stoi(argv[5]);
+		config.method = "ChaCha(20)";
+		config.timeout = boost::posix_time::seconds(2);
+		msocks::server_endpoint server(ioc, pool, std::move(config));
+		server.start();
+		ioc.run();
 	}
-  return 0;
+	else
+	{
+		msocks::client_config config;
+		config.local_address = "127.0.0.1";
+		config.local_port = 1081;
+		config.key = key;
+		config.remote_address = argv[2];
+		config.remote_port = std::stoi(argv[3]);
+		config.method = "ChaCha(20)";
+		config.timeout = boost::posix_time::seconds(2);
+		msocks::client_endpoint client(ioc, std::move(config));
+		client.start();
+		ioc.run();
+	}
 }
+

@@ -4,8 +4,6 @@ Description = msocks daemon service
 [Service]
 ExecStart=/usr/bin/msocks s 0.0.0.0 4500 123456 4096
 ExecStop=/bin/kill -TERM $MAINPID
-After=network.target
-killMode=process
 
 [Install]
 WantedBy=multi-user.target
