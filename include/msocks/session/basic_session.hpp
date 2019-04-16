@@ -32,9 +32,9 @@ protected:
 	io_context& ioc_;
 	std::string uuid_;
 	ip::tcp::socket local_;
-	std::array<uint8_t, 4096> buffer_local_;
+	std::array<uint8_t, MSOCKS_BUFFER_SIZE> buffer_local_;
 	ip::tcp::socket remote_;
-	std::array<uint8_t, 4096> buffer_remote_;
+	std::array<uint8_t, MSOCKS_BUFFER_SIZE> buffer_remote_;
 
 	std::unique_ptr<Botan::StreamCipher> send_cipher_;
 	std::unique_ptr<Botan::StreamCipher> recv_cipher_;
