@@ -8,6 +8,8 @@ set(Boost_USE_STATIC_RUNTIME ON)
 set(Boost_ARCHITECTURE -x64)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+set(MSOCKS_BUFFER_SIZE 4096)
+
 
 find_package(Threads REQUIRED)
 find_package(Botan2 2.9.0 REQUIRED)
@@ -20,7 +22,7 @@ include_directories(include)
 
 add_definitions(-DBOOST_ASIO_NO_DEPRECATED)
 add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
-
+add_definitions(-DMSOCKS_BUFFER_SIZE=${MSOCKS_BUFFER_SIZE})
 if (MSVC)
 	add_definitions(-D_WIN32_WINNT=0x0601)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -34,7 +36,7 @@ if (MSVC)
 			CMAKE_C_FLAGS_MINSIZEREL
 			CMAKE_C_FLAGS_RELWITHDEBINFO
 		)
-
+# REPLACE MD(MultiThread DLL) TO MT (MultiThread) 
 	foreach(CompilerFlag ${CompilerFlags})
 		string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
 	endforeach()
