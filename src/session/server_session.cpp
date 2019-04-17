@@ -1,14 +1,17 @@
 #include <boost/asio/read.hpp>
 #include <boost/asio/write.hpp>
-#include <boost/asio/ip/udp.hpp>
 #include <boost/asio/deadline_timer.hpp>
-#include <botan/stream_cipher.h>
-#include <botan/auto_rng.h>
+#include <boost/endian/conversion.hpp>
 
 #include <msocks/utility/socket_pair.hpp>
 #include <msocks/session/server_session.hpp>
+#include <msocks/utility/socks_constants.hpp>
+#include <msocks/utility/socks_erorr.hpp>
+
+#include <botan/auto_rng.h>
 
 #include <spdlog/spdlog.h>
+using namespace boost::endian;
 
 namespace msocks
 {
@@ -33,7 +36,6 @@ void server_session::start(yield_context yield)
 			}
 		});
 		auto [host, service] = async_handshake(yield);
-		spdlog::info("[{}] connect to {}:{}", uuid(), host, service);
 		auto result = resolver.async_resolve(host, service, yield);
 		remote_.async_connect(*result.begin(), yield);
 		timer.cancel();
@@ -61,36 +63,56 @@ void server_session::start(yield_context yield)
 
 void server_session::fwd_local_remote(yield_context yield)
 {
-	error_code ec;
-	utility::socket_pair(
-		local_, remote_,
-		ioc_,
-		buffer(buffer_local_),
-		[this](std::size_t n,yield_context yield)
-		{
-			attribute_.limiter->async_get(n, yield);
-		},
-		[this](mutable_buffer m_buf)
-		{
-			recv_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
-		},yield[ec]);
+	try
+	{
+		error_code ec;
+		utility::socket_pair(
+			local_, remote_,
+			ioc_,
+			buffer(buffer_local_),
+			[this](std::size_t n, yield_context yield)
+			{
+				attribute_.limiter->async_get(n, yield);
+			},
+			[this](mutable_buffer m_buf)
+			{
+				local_remote_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+				printf("\n");
+			}, yield[ec]);
+	}
+	catch (system_error & ignored)
+	{
+
+	}
 }
 
 void server_session::fwd_remote_local(yield_context yield)
 {
-	error_code ec;
-	utility::socket_pair(
-		remote_, local_,
-		ioc_,
-		buffer(buffer_remote_),
-		[this](std::size_t n,yield_context yield)
-		{
-			attribute_.limiter->async_get(n,yield);
-		},
-		[this](mutable_buffer m_buf)
-		{
-			send_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
-		}, yield[ec]);
+	try
+	{
+		std::vector<uint8_t> iv(8);
+		Botan::AutoSeeded_RNG rng;
+		rng.randomize(iv.data(), iv.size());
+		cipher_setup(remote_local_cipher_, attribute_.method, attribute_.key, iv);
+		async_write(local_, buffer(iv), yield);
+
+		error_code ec;
+		utility::socket_pair(
+			remote_, local_,
+			ioc_,
+			buffer(buffer_remote_),
+			[this](std::size_t n, yield_context yield)
+			{
+				attribute_.limiter->async_get(n, yield);
+			},
+			[this](mutable_buffer m_buf)
+			{
+				remote_local_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+			}, yield[ec]);
+	}
+	catch (system_error & ignored)
+	{
+	}
 }
 
 void server_session::do_async_handshake(
@@ -99,29 +121,68 @@ void server_session::do_async_handshake(
 {
 	error_code ec;
 	std::pair<std::string, std::string> result;
+	std::vector<uint8_t> iv(8);
 	try
 	{
-		Botan::AutoSeeded_RNG rng;
-		std::vector<uint8_t> send_iv(8);
-		rng.randomize(send_iv.data(), send_iv.size());
-		async_write(local_, buffer(send_iv), transfer_all(), yield);
-		cipher_setup(send_cipher_, attribute_.method, attribute_.key, send_iv);
 
-		uint16_t size = 0;
-		async_read(local_, buffer(&size, sizeof(size)), yield);
-		std::vector<uint8_t> recv_iv(8);
-		std::vector<uint8_t> host_service(size - 8);
-		std::vector<mutable_buffer> sequence
+		async_read(local_, buffer(iv), yield);
+		cipher_setup(local_remote_cipher_, attribute_.method, attribute_.key, iv);
+		uint8_t address_type = 0;
+		async_read(local_, buffer(&address_type, sizeof(address_type)), yield);
+		local_remote_cipher_->cipher1(&address_type, 1);
+		if (address_type == socks::addr_ipv4)
 		{
-			buffer(recv_iv),
-			buffer(host_service)
-		};
-		async_read(local_, sequence, yield);
-		cipher_setup(recv_cipher_, attribute_.method, attribute_.key, recv_iv);
-		recv_cipher_->decrypt(host_service);
-		auto split = std::find(host_service.begin(), host_service.end(), ':');
-		result.first = std::string(host_service.begin(), split);
-		result.second = std::string(split + 1, host_service.end());
+			uint32_t ipv4;
+			uint16_t port;
+			std::array<mutable_buffer, 2> sequence
+			{
+				buffer(&ipv4,sizeof(ipv4)),
+				buffer(&port,sizeof(port))
+			};
+			async_read(local_, sequence, transfer_all(), yield);
+			local_remote_cipher_->cipher1((uint8_t*)& ipv4, sizeof(ipv4));
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+			result.first = ip::make_address_v4(big_to_native(ipv4)).to_string();
+			result.second = std::to_string(big_to_native(port));
+		}
+		else if (address_type == socks::addr_ipv6)
+		{
+			ip::address_v6::bytes_type ipv6;
+			uint16_t port;
+			std::array<mutable_buffer, 2> sequence
+			{
+				buffer(&ipv6,ipv6.size()),
+				buffer(&port,sizeof(port))
+			};
+			async_read(local_, sequence, transfer_all(), yield);
+			local_remote_cipher_->cipher1(ipv6.data(), ipv6.size());
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+			std::reverse(ipv6.begin(), ipv6.end());
+			result.first = ip::make_address_v6(ipv6).to_string();
+			result.second = std::to_string(big_to_native(port));
+		}
+		else if (address_type == socks::addr_domain)
+		{
+			uint8_t domain_length;
+			std::string domain;
+			uint16_t port;
+
+			async_read(local_, buffer(&domain_length, sizeof(domain_length)), yield);
+			local_remote_cipher_->cipher1(&domain_length, sizeof(domain_length));
+
+			async_read(local_, dynamic_buffer(domain), transfer_exactly(domain_length), yield);
+			local_remote_cipher_->cipher1((uint8_t*)domain.data(), domain.size());
+
+			async_read(local_, buffer(&port, sizeof(port)), yield);
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+
+			result.first = domain;
+			result.second = std::to_string(big_to_native(port));
+		}
+		else
+		{
+			throw system_error(errc::address_not_supported, socks_category());
+		}
 	}
 	catch (system_error & e)
 	{

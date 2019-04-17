@@ -32,9 +32,9 @@ private:
 
 	void start(yield_context yield);
 
-	async_result<yield_context, void(error_code)>::return_type async_handshake(const std::string& host_service, yield_context yield);
+	async_result<yield_context, void(error_code)>::return_type async_handshake(const std::vector<uint8_t>& target_address, yield_context yield);
 
-	void do_async_handshake(async_result<yield_context, void(error_code)>::completion_handler_type handler, const std::string& host_service, yield_context yield);
+	void do_async_handshake(async_result<yield_context, void(error_code)>::completion_handler_type handler, const std::vector<uint8_t> &target_address, yield_context yield);
 
 	void fwd_local_remote(yield_context yield);
 	void fwd_remote_local(yield_context yield);

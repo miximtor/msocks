@@ -72,7 +72,7 @@ typename pool<Session>::shared_pointer_type pool<Session>::take(Args&& ... args)
 		notify_reuse(*session, std::forward<Args>(args)...);
 	}
 	out_++;
-	return unique_pointer_type(session,[this](pointer_type session){recycle(session);});
+	return unique_pointer_type(session, [this](pointer_type session) { recycle(session); });
 }
 
 template <typename Session>
@@ -96,10 +96,9 @@ void pool<Session>::timed_shrink_list()
 				timer_.expires_after(std::chrono::seconds(30));
 				error_code ec;
 				timer_.async_wait(yield[ec]);
-				spdlog::info("pool: ready release {} session", session_list_.size() > out_ / 2 ? session_list_.size() - out_ / 2 : 0);
 				while (session_list_.size() > out_ / 2)
 				{
-					pointer_type session = session_list_.take();
+					pointer_type session = session_list_.release();
 					delete session;
 				}
 			}

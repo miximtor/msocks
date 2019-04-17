@@ -17,11 +17,10 @@ void client_session::start(yield_context yield)
 {
 	try
 	{
-		auto host_service = utility::async_local_socks5(ioc_, local_, yield);
-		spdlog::info("[{}] connect to: {}", uuid_, host_service);
+		auto target_address = utility::async_local_socks5(ioc_, local_, yield);
 		ip::tcp::endpoint ep(ip::make_address(attribute_.remote_address), attribute_.remote_port);
 		remote_.async_connect(ep, yield);
-		async_handshake(host_service, yield);
+		async_handshake(target_address, yield);
 		spawn(
 			ioc_,
 			[this, p = shared_from_this()](yield_context yield)
@@ -42,16 +41,16 @@ void client_session::start(yield_context yield)
 }
 
 async_result<yield_context, void(error_code)>::return_type client_session::async_handshake(
-	const std::string& host_service,
+	const std::vector<uint8_t>& target_address,
 	yield_context yield)
 {
 	async_result<yield_context, void(error_code)>::completion_handler_type handler(yield);
 	async_result<yield_context, void(error_code)> result(handler);
 	spawn(
 		ioc_,
-		[this, p = shared_from_this(), &host_service, handler](yield_context yield)
+		[this, p = shared_from_this(), target_address, handler](yield_context yield)
 	{
-		do_async_handshake(handler, host_service, yield);
+		do_async_handshake(handler, target_address, yield);
 	}
 	);
 	return result.get();
@@ -59,33 +58,50 @@ async_result<yield_context, void(error_code)>::return_type client_session::async
 
 void client_session::fwd_remote_local(yield_context yield)
 {
-	error_code ec;
-	utility::socket_pair(
-		remote_, local_,
-		ioc_,
-		buffer(buffer_remote_),
-		[](std::size_t, yield_context) { return; },
-		[this](mutable_buffer m_buf)
-		{
-			recv_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
-		},
-		yield[ec]);
+	try
+	{
+		std::vector<uint8_t> iv(8);
+		async_read(remote_, buffer(iv), yield);
+		cipher_setup(remote_local_cipher_, attribute_.method, attribute_.key, iv);
+		
+		error_code ec;
+		utility::socket_pair(
+			remote_, local_,
+			ioc_,
+			buffer(buffer_remote_),
+			[](std::size_t, yield_context) { return; },
+			[this](mutable_buffer m_buf)
+			{
+				remote_local_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+			},
+			yield[ec]);
+
+	}
+	catch (system_error & ignored)
+	{
+	}
 }
 
 void client_session::fwd_local_remote(yield_context yield)
 {
+	try
+	{
+		error_code ec;
+		utility::socket_pair(
+			local_, remote_,
+			ioc_,
+			buffer(buffer_local_),
+			[](std::size_t n, yield_context) { return; },
+			[this](mutable_buffer m_buf)
+			{
+				local_remote_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+			},
+			yield[ec]);
 
-	error_code ec;
-	utility::socket_pair(
-		local_, remote_,
-		ioc_,
-		buffer(buffer_local_),
-		[](std::size_t n, yield_context) { return; },
-		[this](mutable_buffer m_buf)
-		{
-			send_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
-		},
-		yield[ec]);
+	}
+	catch (system_error & ignored)
+	{
+	}
 }
 
 void client_session::go()
@@ -101,35 +117,24 @@ void client_session::go()
 
 void client_session::do_async_handshake(
 	async_result<yield_context, void(error_code)>::completion_handler_type handler,
-	const std::string& host_service,
+	const std::vector<uint8_t>& target_address,
 	yield_context yield)
 {
 	error_code ec;
 	try
 	{
 		Botan::AutoSeeded_RNG rng;
-
-		std::vector<uint8_t> send_iv(8);
-		std::vector<uint8_t> recv_iv(8);
-
-		rng.randomize(send_iv.data(), send_iv.size());
-
-		cipher_setup(send_cipher_, attribute_.method, attribute_.key, send_iv);
-		auto size = static_cast<uint16_t>(send_iv.size() + host_service.size());
-		std::vector<uint8_t> temp(host_service.begin(), host_service.end());
-		send_cipher_->encrypt(temp);
-
-		std::array<const_buffer, 3> buffers
+		std::vector<uint8_t> iv(8);
+		rng.randomize(iv.data(), iv.size());
+		cipher_setup(local_remote_cipher_, attribute_.method, attribute_.key, iv);
+		auto target_address_encrypted = target_address;
+		local_remote_cipher_->encrypt(target_address_encrypted);
+		std::array<const_buffer, 2> buffers
 		{
-			buffer(&size, sizeof(size)),
-			buffer(send_iv),
-			buffer(temp)
+			buffer(iv),
+			buffer(target_address_encrypted)
 		};
-
 		async_write(remote_, buffers, transfer_all(), yield);
-
-		async_read(remote_, buffer(recv_iv), transfer_all(), yield);
-		cipher_setup(recv_cipher_, attribute_.method, attribute_.key, recv_iv);
 	}
 	catch (system_error & e)
 	{

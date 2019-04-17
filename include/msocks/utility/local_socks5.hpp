@@ -20,12 +20,14 @@ namespace detail
 void do_local_socks5(
 	io_context& ioc,
 	ip::tcp::socket& local,
-	async_result<yield_context, void(error_code, std::string)>::completion_handler_type handler,
+	async_result<yield_context, void(error_code, std::vector<uint8_t>)>::completion_handler_type handler,
 	yield_context yield);
 }
 
-async_result<yield_context, void(error_code,std::string)>::return_type
+async_result<yield_context, void(error_code,std::vector<uint8_t>)>::return_type
 async_local_socks5(io_context& ioc, ip::tcp::socket& local, yield_context yield);
+
+
 
 }
 

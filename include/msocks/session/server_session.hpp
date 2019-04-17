@@ -4,7 +4,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <msocks/utility/rate_limiter.hpp>
 #include <msocks/session/basic_session.hpp>
-#include <msocks/utility/intrusive_list.hpp>
+#include <msocks/utility/intrusive_list_hook.hpp>
 
 using namespace boost::asio;
 using namespace boost::system;
@@ -25,7 +25,7 @@ struct server_session_attribute
 class server_session final : 
 	public basic_session, 
 	public std::enable_shared_from_this<server_session>,
-	public utility::intrusive_list_node<server_session>
+	public utility::intrusive_list_hook<server_session>
 {
 public:
 
