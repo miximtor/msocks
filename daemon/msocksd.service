@@ -1,3 +1,9 @@
+[Unit]
+Description = msocks daemon service
+
 [Service]
-ExecStart=/usr/bin/msocks
-Type = simple
+ExecStart=/usr/bin/msocks s 0.0.0.0 4500 123456 4096
+ExecStop=/bin/kill -TERM $MAINPID
+
+[Install]
+WantedBy=multi-user.target

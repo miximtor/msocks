@@ -1,183 +1,229 @@
 #include <boost/asio/read.hpp>
 #include <boost/asio/write.hpp>
-#include <boost/asio/ip/udp.hpp>
+#include <boost/asio/deadline_timer.hpp>
+#include <boost/endian/conversion.hpp>
 
-#include <botan/stream_cipher.h>
+#include <msocks/utility/socket_pair.hpp>
+#include <msocks/session/server_session.hpp>
+#include <msocks/utility/socks_constants.hpp>
+#include <msocks/utility/socks_erorr.hpp>
+
 #include <botan/auto_rng.h>
 
-#include <msocks/session/server_session.hpp>
-#include <msocks/utility/socket_pair.hpp>
-
 #include <spdlog/spdlog.h>
+using namespace boost::endian;
 
 namespace msocks
 {
-
-server_session::server_session(
-	io_context::strand &strand_,
-	ip::tcp::socket local_,
-	const std::vector<uint8_t> &key_,
-	std::shared_ptr<utility::limiter> limiter_) :
-	session(strand_, std::move(local_), key_),
-	limiter(std::move(limiter_))
-{}
 
 void server_session::start(yield_context yield)
 {
 	try
 	{
-		steady_timer timer(strand.context());
-		ip::tcp::resolver resolver(local.get_executor().context());
-		spawn(strand, [this, p = shared_from_this(), &resolver, &timer](yield_context yield)
+		deadline_timer timer(ioc_);
+		ip::tcp::resolver resolver(ioc_);
+		spawn(
+			ioc_, [this, p = shared_from_this(), &resolver, &timer](yield_context yield)
 		{
-			timer.expires_after(std::chrono::milliseconds(600));
+			timer.expires_from_now(attribute_.timeout);
 			error_code ec;
 			timer.async_wait(yield[ec]);
-			if ( ec != error::operation_aborted )
+			if (ec != error::operation_aborted)
 			{
-				error_code ec;
-				local.cancel(ec);
+				local_.cancel(ec);
 				resolver.cancel();
-				remote.cancel(ec);
+				remote_.cancel(ec);
 			}
 		});
-		auto[host, service] = async_handshake(yield);
+		auto [host, service] = async_handshake(yield);
 		auto result = resolver.async_resolve(host, service, yield);
-		remote.async_connect(*result.begin(), yield);
+		remote_.async_connect(*result.begin(), yield);
 		timer.cancel();
 		spawn(
-			strand,
+			ioc_,
 			[this, p = shared_from_this()](yield_context yield)
-			{
-				fwd_local_remote(yield);
-			});
+		{
+			fwd_local_remote(yield);
+		});
 		spawn(
-			strand,
+			ioc_,
 			[this, p = shared_from_this()](yield_context yield)
-			{
-				fwd_remote_local(yield);
-			});
+		{
+			fwd_remote_local(yield);
+		});
 	}
-	catch ( system_error &e )
+	catch (system_error& e)
 	{
-		
-		spdlog::info("[{}] error: {}", session_uuid, e.what());
+		if (e.code() != error::operation_aborted)
+		{
+			spdlog::info("[{}] error: {}", uuid_, e.what());
+		}
 	}
 }
 
 void server_session::fwd_local_remote(yield_context yield)
 {
-	auto ec = pair(local, remote, yield, buffer(buffer_local),
-								 [this, yield](mutable_buffer b)
-								 {
-									 recv_cipher->cipher1((uint8_t *) b.data(), b.size());
-								 });
-	switch ( ec.value())
+	try
 	{
-		case error::eof:
-		case error::operation_aborted:
-		case error::connection_reset:
-			break;
-		default:
-			break;
+		error_code ec;
+		utility::socket_pair(
+			local_, remote_,
+			ioc_,
+			buffer(buffer_local_),
+			[this](std::size_t n, yield_context yield)
+			{
+				attribute_.limiter->async_get(n, yield);
+			},
+			[this](mutable_buffer m_buf)
+			{
+				local_remote_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+				printf("\n");
+			}, yield[ec]);
 	}
-	error_code ignored_ec;
-	local.cancel(ignored_ec);
-	remote.cancel(ignored_ec);
+	catch (system_error & ignored)
+	{
+
+	}
 }
 
 void server_session::fwd_remote_local(yield_context yield)
 {
-	auto ec = pair(remote, local, yield, buffer(buffer_remote),
-								 [this, yield](mutable_buffer b)
-								 {
-									 limiter->async_get(b.size(), yield);
-									 send_cipher->cipher1((uint8_t *) b.data(), b.size());
-								 });
-	switch ( ec.value())
+	try
 	{
-		case error::eof:
-		case error::operation_aborted:
-			break;
-		default:
-			break;
+		std::vector<uint8_t> iv(8);
+		Botan::AutoSeeded_RNG rng;
+		rng.randomize(iv.data(), iv.size());
+		cipher_setup(remote_local_cipher_, attribute_.method, attribute_.key, iv);
+		async_write(local_, buffer(iv), yield);
+
+		error_code ec;
+		utility::socket_pair(
+			remote_, local_,
+			ioc_,
+			buffer(buffer_remote_),
+			[this](std::size_t n, yield_context yield)
+			{
+				attribute_.limiter->async_get(n, yield);
+			},
+			[this](mutable_buffer m_buf)
+			{
+				remote_local_cipher_->cipher1((uint8_t*)m_buf.data(), m_buf.size());
+			}, yield[ec]);
 	}
-	error_code ignored_ec;
-	local.cancel(ignored_ec);
-	remote.cancel(ignored_ec);
+	catch (system_error & ignored)
+	{
+	}
 }
 
 void server_session::do_async_handshake(
-	server_session::Handler handler,
+	async_result<yield_context, void(error_code, std::pair<std::string, std::string>)>::completion_handler_type handler,
 	yield_context yield)
 {
 	error_code ec;
 	std::pair<std::string, std::string> result;
+	std::vector<uint8_t> iv(8);
 	try
 	{
-		Botan::AutoSeeded_RNG rng;
-		std::vector<uint8_t> send_iv(8);
-		rng.randomize(send_iv.data(), send_iv.size());
-		async_write(local, buffer(send_iv), transfer_all(), yield);
-		cipher_setup("ChaCha(20)", send_iv, send_cipher);
-		
-		uint16_t size = 0;
-		async_read(local, buffer(&size, sizeof(size)), yield);
-		std::vector<uint8_t> recv_iv(8);
-		std::vector<uint8_t> host_service(size - 8);
-		std::vector<mutable_buffer> sequence
+
+		async_read(local_, buffer(iv), yield);
+		cipher_setup(local_remote_cipher_, attribute_.method, attribute_.key, iv);
+		uint8_t address_type = 0;
+		async_read(local_, buffer(&address_type, sizeof(address_type)), yield);
+		local_remote_cipher_->cipher1(&address_type, 1);
+		if (address_type == socks::addr_ipv4)
+		{
+			uint32_t ipv4;
+			uint16_t port;
+			std::array<mutable_buffer, 2> sequence
 			{
-				buffer(recv_iv),
-				buffer(host_service)
+				buffer(&ipv4,sizeof(ipv4)),
+				buffer(&port,sizeof(port))
 			};
-		async_read(local, sequence, yield);
-		cipher_setup("ChaCha(20)", recv_iv, recv_cipher);
-		recv_cipher->decrypt(host_service);
-		auto split = std::find(host_service.begin(), host_service.end(), ':');
-		result.first = std::string(host_service.begin(), split);
-		result.second = std::string(split + 1, host_service.end());
+			async_read(local_, sequence, transfer_all(), yield);
+			local_remote_cipher_->cipher1((uint8_t*)& ipv4, sizeof(ipv4));
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+			result.first = ip::make_address_v4(big_to_native(ipv4)).to_string();
+			result.second = std::to_string(big_to_native(port));
+		}
+		else if (address_type == socks::addr_ipv6)
+		{
+			ip::address_v6::bytes_type ipv6;
+			uint16_t port;
+			std::array<mutable_buffer, 2> sequence
+			{
+				buffer(&ipv6,ipv6.size()),
+				buffer(&port,sizeof(port))
+			};
+			async_read(local_, sequence, transfer_all(), yield);
+			local_remote_cipher_->cipher1(ipv6.data(), ipv6.size());
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+			std::reverse(ipv6.begin(), ipv6.end());
+			result.first = ip::make_address_v6(ipv6).to_string();
+			result.second = std::to_string(big_to_native(port));
+		}
+		else if (address_type == socks::addr_domain)
+		{
+			uint8_t domain_length;
+			std::string domain;
+			uint16_t port;
+
+			async_read(local_, buffer(&domain_length, sizeof(domain_length)), yield);
+			local_remote_cipher_->cipher1(&domain_length, sizeof(domain_length));
+
+			async_read(local_, dynamic_buffer(domain), transfer_exactly(domain_length), yield);
+			local_remote_cipher_->cipher1((uint8_t*)domain.data(), domain.size());
+
+			async_read(local_, buffer(&port, sizeof(port)), yield);
+			local_remote_cipher_->cipher1((uint8_t*)& port, sizeof(port));
+
+			result.first = domain;
+			result.second = std::to_string(big_to_native(port));
+		}
+		else
+		{
+			throw system_error(errc::address_not_supported, socks_category());
+		}
 	}
-	catch ( system_error &e )
+	catch (system_error & e)
 	{
-		if ( e.code() != error::operation_aborted )
+		if (e.code() != error::operation_aborted)
 			ec = e.code();
 	}
-	auto cb = [handler, ec, result]()mutable
-	{ handler(ec, result); };
-	post(strand, std::move(cb));
+	post(ioc_, std::bind(handler, ec, result));
 }
 
-server_session::Result::return_type
+async_result<yield_context, void(error_code, std::pair<std::string, std::string>)>::return_type
 server_session::async_handshake(yield_context yield)
 {
-	Handler handler(yield);
-	Result result(handler);
+	async_result<yield_context, void(error_code, std::pair<std::string, std::string>)>::completion_handler_type handler(yield);
+	async_result<yield_context, void(error_code, std::pair<std::string, std::string>)> result(handler);
 	spawn(
-		strand,
+		ioc_,
 		[handler, this, p = shared_from_this()](yield_context yield)
-		{
-			do_async_handshake(handler, yield);
-		});
+	{
+		do_async_handshake(handler, yield);
+	});
 	return result.get();
 }
 
+
 void server_session::go()
 {
-	spawn(strand, [this, p = shared_from_this()](yield_context yield)
+	spawn(
+		ioc_,
+		[this, p = shared_from_this()](yield_context yield)
 	{
 		start(yield);
 	});
-}
 
-void server_session::notify_reuse(
-	const io_context::strand &strand_, ip::tcp::socket local_,
-	const std::vector<uint8_t> &key_, const std::shared_ptr<utility::limiter> &limiter_)
+}
+void
+server_session::notify_reuse(const io_context& ioc, ip::tcp::socket local, const server_session_attribute& attribute)
 {
-	(void) strand_;
-	(void) key_;
-	(void) limiter_;
-	local = std::move(local_);
-	remote = ip::tcp::socket(local.get_executor().context());
+	(void)ioc;
+	(void)attribute;
+	local_ = std::move(local);
+	remote_ = ip::tcp::socket(ioc_);
 }
 
 }
